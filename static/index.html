@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gmail Cleaner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3248; --mint: #4fffb0; --mint-dim: #1a4a38;
+    --red: #ff4f6b; --red-dim: #3a1a22; --text: #e8eaf0;
+    --muted: #7b829a; --radius: 12px;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px;
+  }
+  header { text-align: center; margin-bottom: 32px; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .logo-icon { width: 40px; height: 40px; background: var(--mint); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 640px; margin-bottom: 14px; }
+  .card-title { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+
+  /* Cuentas */
+  .cuenta-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .cuenta-item {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .cuenta-item:hover { border-color: var(--mint); }
+  .cuenta-item.activa { border-color: var(--mint); background: var(--mint-dim); }
+  .cuenta-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--border); display: flex; align-items: center;
+    justify-content: center; font-size: 15px; font-weight: 700;
+    color: var(--mint); flex-shrink: 0;
+  }
+  .cuenta-email { font-size: 14px; font-weight: 500; flex: 1; }
+  .cuenta-badge { font-size: 11px; color: var(--mint); font-weight: 600; }
+  .btn-remove {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; font-size: 16px; padding: 2px 6px;
+    border-radius: 4px; transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-remove:hover { color: var(--red); }
+
+  .btn-add-cuenta {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2); border: 1.5px dashed var(--border);
+    border-radius: 8px; padding: 12px 14px; cursor: pointer;
+    font-size: 14px; color: var(--muted); width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-add-cuenta:hover { border-color: var(--mint); color: var(--mint); }
+
+  /* Filtros */
+  #filters-section { display: none; }
+  .filtros-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .filtro-item { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 13px; display: flex; align-items: center; gap: 9px; cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+  .filtro-item:hover { border-color: var(--mint); }
+  .filtro-item.active { border-color: var(--mint); background: var(--mint-dim); }
+  .filtro-item input[type=checkbox] { display: none; }
+  .filtro-emoji { font-size: 17px; }
+  .filtro-label { font-size: 13px; font-weight: 500; }
+  .filtro-check { margin-left: auto; width: 17px; height: 17px; border: 1.5px solid var(--border); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: all 0.15s; flex-shrink: 0; }
+  .filtro-item.active .filtro-check { background: var(--mint); border-color: var(--mint); color: #0f1117; }
+  .warning-box { background: #2a1f0a; border: 1px solid #5a3e0a; border-radius: 8px; padding: 11px 13px; font-size: 12px; color: #d4a843; margin-top: 12px; display: none; }
+  .warning-box.show { display: block; }
+
+  /* Acciones */
+  #actions-section { display: none; }
+  .btn-row { display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 13px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1.5px solid var(--border) !important; }
+  .btn-secondary:hover:not(:disabled) { border-color: var(--mint) !important; color: var(--mint); }
+  .btn-delete { background: var(--red); color: white; }
+  .btn-delete:hover:not(:disabled) { opacity: 0.85; }
+
+  /* Lista */
+  #list-section { display: none; }
+  .list-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .list-count { font-size: 13px; color: var(--muted); flex: 1; }
+  .list-count strong { color: var(--mint); }
+  .btn-sm { padding: 7px 13px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface2); color: var(--text); transition: border-color 0.15s, color 0.15s; white-space: nowrap; }
+  .btn-sm:hover { border-color: var(--mint); color: var(--mint); }
+  .btn-delete-sel { padding: 7px 13px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: var(--red); color: white; transition: opacity 0.15s; white-space: nowrap; }
+  .btn-delete-sel:hover { opacity: 0.85; }
+  .btn-delete-sel:disabled { opacity: 0.35; cursor: not-allowed; }
+  .email-list { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+  .email-list::-webkit-scrollbar { width: 5px; }
+  .email-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  .email-item { display: flex; align-items: center; gap: 11px; background: var(--surface2); border-radius: 8px; padding: 11px 13px; cursor: pointer; border: 1.5px solid transparent; transition: border-color 0.12s; user-select: none; }
+  .email-item:hover { border-color: var(--border); }
+  .email-item.selected { border-color: var(--mint); background: var(--mint-dim); }
+  .email-cb { width: 17px; height: 17px; flex-shrink: 0; border: 1.5px solid var(--border); border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: all 0.12s; }
+  .email-item.selected .email-cb { background: var(--mint); border-color: var(--mint); color: #0f1117; }
+  .email-info { flex: 1; min-width: 0; }
+  .email-from { font-size: 12px; color: var(--mint); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .email-subject { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .email-date { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+  .sel-bar { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .sel-label { font-size: 13px; color: var(--muted); flex: 1; }
+  .sel-label strong { color: var(--text); }
+
+  /* Progreso / Done */
+  #progress-section { display: none; text-align: center; }
+  .progress-wrap { background: var(--surface2); border-radius: 100px; height: 8px; overflow: hidden; margin: 16px 0 8px; }
+  .progress-bar { height: 100%; background: var(--mint); border-radius: 100px; width: 0%; transition: width 0.4s; }
+  .progress-label { color: var(--muted); font-size: 13px; }
+  #done-section { display: none; text-align: center; }
+  .done-icon { font-size: 48px; margin-bottom: 12px; }
+  .done-title { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .done-sub { color: var(--muted); font-size: 14px; margin-bottom: 22px; }
+  .btn-again { background: var(--surface2); color: var(--text); border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-again:hover { border-color: var(--mint); color: var(--mint); }
+
+  .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.2); border-top-color: currentColor; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧹</div>
+    <h1>Gmail Cleaner</h1>
+  </div>
+  <p class="subtitle">Elimina correos comerciales en segundos</p>
+</header>
+
+<!-- Cuentas -->
+<div class="card" id="accounts-section">
+  <div class="card-title">Paso 1 · Elige una cuenta de Gmail</div>
+  <div class="cuenta-list" id="cuenta-list"></div>
+  <button class="btn-add-cuenta" onclick="agregarCuenta()">
+    <span>＋</span> Añadir cuenta de Gmail
+  </button>
+  <div class="auth-status" id="auth-status" style="margin-top:12px;font-size:13px;color:var(--muted);min-height:18px;"></div>
+</div>
+
+<!-- Filtros -->
+<div class="card" id="filters-section">
+  <div class="card-title">Paso 2 · Qué quieres buscar</div>
+  <div class="filtros-grid">
+    <label class="filtro-item active" data-key="promociones"><input type="checkbox" checked><span class="filtro-emoji">📢</span><span class="filtro-label">Promociones</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item active" data-key="baja"><input type="checkbox" checked><span class="filtro-emoji">📧</span><span class="filtro-label">Newsletters</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item active" data-key="aliexpress"><input type="checkbox" checked><span class="filtro-emoji">📦</span><span class="filtro-label">AliExpress</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item active" data-key="paypal"><input type="checkbox" checked><span class="filtro-emoji">💳</span><span class="filtro-label">PayPal</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item active" data-key="amazon"><input type="checkbox" checked><span class="filtro-emoji">🛒</span><span class="filtro-label">Amazon</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item active" data-key="pedidos"><input type="checkbox" checked><span class="filtro-emoji">🚚</span><span class="filtro-label">Confirmaciones de compra</span><span class="filtro-check">✓</span></label>
+    <label class="filtro-item" data-key="dhl"><input type="checkbox"><span class="filtro-emoji">🟡</span><span class="filtro-label">DHL</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="gls"><input type="checkbox"><span class="filtro-emoji">🔵</span><span class="filtro-label">GLS</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="correos"><input type="checkbox"><span class="filtro-emoji">📮</span><span class="filtro-label">Correos</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="noreply"><input type="checkbox"><span class="filtro-emoji">🤖</span><span class="filtro-label">No-reply</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="vinted"><input type="checkbox"><span class="filtro-emoji">👗</span><span class="filtro-label">Vinted</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="wallapop"><input type="checkbox"><span class="filtro-emoji">🛍️</span><span class="filtro-label">Wallapop</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="spotify"><input type="checkbox"><span class="filtro-emoji">🎵</span><span class="filtro-label">Spotify</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="google"><input type="checkbox"><span class="filtro-emoji">🔔</span><span class="filtro-label">Notif. Google</span><span class="filtro-check"></span></label>
+    <label class="filtro-item" data-key="noleidos"><input type="checkbox"><span class="filtro-emoji">📬</span><span class="filtro-label">No leídos</span><span class="filtro-check"></span></label>
+  </div>
+  <div class="warning-box" id="warning-noleidos">⚠️ "No leídos" incluirá todos los correos sin leer, no solo los comerciales.</div>
+</div>
+
+<!-- Acciones -->
+<div class="card" id="actions-section">
+  <div class="card-title">Paso 3 · Limpiar</div>
+  <div class="btn-row">
+    <button class="btn btn-secondary" id="btn-buscar" onclick="buscar()">🔍 Buscar y seleccionar</button>
+    <button class="btn btn-delete" id="btn-borrar-todo" onclick="borrarTodo()">🗑️ Eliminar todos</button>
+  </div>
+  <button class="btn btn-delete" style="margin-top:10px;width:100%;" onclick="borrarNoLeidos()">📬 Eliminar TODOS los no leídos (742+)</button>
+</div>
+
+<!-- Lista -->
+<div class="card" id="list-section">
+  <div class="card-title">Correos encontrados · elige cuáles eliminar</div>
+  <div class="list-toolbar">
+    <div class="list-count" id="list-count"></div>
+    <button class="btn-sm" onclick="seleccionarTodos()">Seleccionar todo</button>
+    <button class="btn-sm" onclick="deseleccionarTodos()">Ninguno</button>
+  </div>
+  <div class="email-list" id="email-list"></div>
+  <div class="sel-bar">
+    <div class="sel-label"><strong id="sel-count">0</strong> seleccionados</div>
+    <button class="btn-delete-sel" id="btn-borrar-sel" onclick="borrarSeleccionados()" disabled>🗑️ Eliminar seleccionados</button>
+  </div>
+</div>
+
+<!-- Progreso -->
+<div class="card" id="progress-section">
+  <div class="card-title">Eliminando correos…</div>
+  <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <div class="progress-label" id="progress-label">Procesando…</div>
+</div>
+
+<!-- Done -->
+<div class="card" id="done-section">
+  <div class="done-icon">✅</div>
+  <div class="done-title" id="done-title">¡Hecho!</div>
+  <div class="done-sub" id="done-sub"></div>
+  <button class="btn-again" onclick="reiniciar()">Limpiar de nuevo</button>
+</div>
+
+<script>
+let todosLosMensajes = [];
+let seleccionados = new Set();
+let cuentaActiva = null;
+
+// ── Cargar cuentas al inicio ────────────────────────────────────────────────
+async function cargarCuentas() {
+  const res = await fetch('/api/cuentas');
+  const data = await res.json();
+  cuentaActiva = data.activa;
+  renderCuentas(data.cuentas);
+}
+
+function renderCuentas(cuentas) {
+  const list = document.getElementById('cuenta-list');
+  list.innerHTML = '';
+  if (cuentas.length === 0) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:13px;margin-bottom:8px;">No hay cuentas guardadas aún.</p>';
+    return;
+  }
+  cuentas.forEach(c => {
+    const inicial = c.email[0].toUpperCase();
+    const esActiva = c.email === cuentaActiva;
+    const div = document.createElement('div');
+    div.className = 'cuenta-item' + (esActiva ? ' activa' : '');
+    div.innerHTML = `
+      <div class="cuenta-avatar">${inicial}</div>
+      <div class="cuenta-email">${c.email}</div>
+      ${esActiva ? '<span class="cuenta-badge">✓ Activa</span>' : ''}
+      <button class="btn-remove" title="Eliminar cuenta" onclick="eliminarCuenta(event,'${c.email}')">✕</button>
+    `;
+    if (!esActiva) {
+      div.addEventListener('click', () => seleccionarCuenta(c.email));
+    }
+    list.appendChild(div);
+  });
+
+  // Mostrar secciones si hay cuenta activa
+  if (cuentaActiva) {
+    document.getElementById('filters-section').style.display = 'block';
+    document.getElementById('actions-section').style.display = 'block';
+  }
+}
+
+async function seleccionarCuenta(email) {
+  document.getElementById('auth-status').textContent = 'Conectando…';
+  try {
+    const res = await fetch('/api/seleccionar-cuenta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error);
+    cuentaActiva = data.email;
+    document.getElementById('auth-status').textContent = '';
+    await cargarCuentas();
+  } catch(e) {
+    document.getElementById('auth-status').textContent = 'Error: ' + e.message;
+  }
+}
+
+async function agregarCuenta() {
+  // En la versión cloud redirigimos a Google OAuth
+  window.location.href = '/auth/start';
+}
+
+async function eliminarCuenta(e, email) {
+  e.stopPropagation();
+  if (!confirm(`¿Eliminar la cuenta ${email} de la app?\n(No borra tus correos, solo el acceso guardado.)`)) return;
+  await fetch('/api/eliminar-cuenta', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
+  if (cuentaActiva === email) {
+    cuentaActiva = null;
+    document.getElementById('filters-section').style.display = 'none';
+    document.getElementById('actions-section').style.display = 'none';
+  }
+  await cargarCuentas();
+}
+
+// ── Filtros ─────────────────────────────────────────────────────────────────
+document.querySelectorAll('.filtro-item').forEach(item => {
+  item.addEventListener('click', () => {
+    item.classList.toggle('active');
+    const cb = item.querySelector('input');
+    cb.checked = !cb.checked;
+    item.querySelector('.filtro-check').textContent = cb.checked ? '✓' : '';
+    const nol = document.querySelector('[data-key="noleidos"]');
+    document.getElementById('warning-noleidos').classList.toggle('show', nol.classList.contains('active'));
+  });
+});
+
+function filtrosActivos() {
+  return [...document.querySelectorAll('.filtro-item.active')].map(el => el.dataset.key).join(',');
+}
+
+// ── Buscar ──────────────────────────────────────────────────────────────────
+async function buscar() {
+  const btn = document.getElementById('btn-buscar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Buscando…';
+  document.getElementById('list-section').style.display = 'none';
+  try {
+    const res = await fetch('/api/buscar?filtros=' + filtrosActivos() + '&limite=300');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    todosLosMensajes = data.correos;
+    seleccionados = new Set(todosLosMensajes.map(m => m.id));
+    renderLista();
+    const aviso = data.total > data.correos.length ? ' (mostrando ' + data.correos.length + ' de ' + data.total + ' — usa Eliminar todos para borrarlos todos)' : '';
+    document.getElementById('list-count').innerHTML = '<strong>' + data.total + '</strong> correos encontrados' + aviso;
+    document.getElementById('list-section').style.display = 'block';
+  } catch(e) { alert('Error: ' + e.message); }
+  btn.disabled = false;
+  btn.innerHTML = '🔍 Buscar y seleccionar';
+}
+
+function renderLista() {
+  const list = document.getElementById('email-list');
+  list.innerHTML = '';
+  todosLosMensajes.forEach(m => {
+    const sel = seleccionados.has(m.id);
+    const div = document.createElement('div');
+    div.className = 'email-item' + (sel ? ' selected' : '');
+    div.dataset.id = m.id;
+    div.innerHTML = `
+      <div class="email-cb">${sel ? '✓' : ''}</div>
+      <div class="email-info">
+        <div class="email-from">${escHtml(m.from)}</div>
+        <div class="email-subject">${escHtml(m.subject || '(sin asunto)')}</div>
+      </div>
+      <div class="email-date">${formatDate(m.date)}</div>
+    `;
+    div.addEventListener('click', () => toggleEmail(m.id, div));
+    list.appendChild(div);
+  });
+  actualizarContador();
+}
+
+function toggleEmail(id, el) {
+  if (seleccionados.has(id)) { seleccionados.delete(id); el.classList.remove('selected'); el.querySelector('.email-cb').textContent = ''; }
+  else { seleccionados.add(id); el.classList.add('selected'); el.querySelector('.email-cb').textContent = '✓'; }
+  actualizarContador();
+}
+function seleccionarTodos() { seleccionados = new Set(todosLosMensajes.map(m => m.id)); renderLista(); }
+function deseleccionarTodos() { seleccionados.clear(); renderLista(); }
+function actualizarContador() { const n = seleccionados.size; document.getElementById('sel-count').textContent = n; document.getElementById('btn-borrar-sel').disabled = n === 0; }
+
+async function borrarSeleccionados() {
+  const ids = [...seleccionados];
+  if (!confirm(`¿Eliminar ${ids.length} correos seleccionados?\n\nIrán a la papelera (30 días para recuperarlos).`)) return;
+  mostrarProgreso();
+  try {
+    const res = await fetch('/api/borrar-ids', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+    const data = await res.json();
+    mostrarDone(data.borrados, data.total);
+  } catch(e) { alert('Error: ' + e.message); reiniciar(); }
+}
+
+async function borrarTodo() {
+  if (!confirm('¿Eliminar TODOS los correos que coincidan con los filtros?\n\nIrán a la papelera (30 días para recuperarlos).')) return;
+  mostrarProgreso();
+  try {
+    const res = await fetch('/api/borrar?filtros=' + filtrosActivos());
+    const data = await res.json();
+    mostrarDone(data.borrados, data.total);
+  } catch(e) { alert('Error: ' + e.message); reiniciar(); }
+}
+
+function mostrarProgreso() {
+  ['list-section','actions-section','filters-section'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('progress-section').style.display = 'block';
+  let p = 0;
+  window._progInterval = setInterval(() => { p = Math.min(p + Math.random() * 4, 88); document.getElementById('progress-bar').style.width = p + '%'; }, 400);
+}
+
+function mostrarDone(borrados, total) {
+  clearInterval(window._progInterval);
+  document.getElementById('progress-bar').style.width = '100%';
+  setTimeout(() => {
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('done-section').style.display = 'block';
+    document.getElementById('done-title').textContent = borrados > 0 ? `¡${borrados} correos eliminados!` : 'Sin resultados';
+    document.getElementById('done-sub').textContent = borrados > 0 ? 'Están en la papelera 30 días, por si necesitas recuperar alguno.' : 'Prueba a cambiar los filtros.';
+  }, 500);
+}
+
+function reiniciar() {
+  ['done-section','list-section','progress-section'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('filters-section').style.display = 'block';
+  document.getElementById('actions-section').style.display = 'block';
+  todosLosMensajes = []; seleccionados.clear();
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function formatDate(d) { if (!d) return ''; try { return new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }); } catch { return ''; } }
+
+async function borrarNoLeidos() {
+  if (!confirm('¿Eliminar TODOS los correos no leídos (excepto favoritos)?\n\nIrán a la papelera 30 días.')) return;
+  mostrarProgreso();
+  try {
+    const res = await fetch('/api/borrar-noleidos');
+    const data = await res.json();
+    mostrarDone(data.borrados, data.total);
+  } catch(e) { alert('Error: ' + e.message); reiniciar(); }
+}
+
+// Cargar cuentas al arrancar
+cargarCuentas();
+</script>
+</body>
+</html>
